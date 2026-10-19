@@ -1,0 +1,6 @@
+{
+  "name": "IronTrack - Gym Sheets & Progression",
+  "description": "Webapp/PWA per la gestione e l'esecuzione degli allenamenti con sincronizzazione diretta su Google Sheets, tracciamento carichi, catalogo ExerciseDB con video tutorial e monitoraggio misure fisiche.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,27 +1,81 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #090D16;
-    color: #F8FAFC;
-    overflow-x: hidden;
-    -webkit-tap-highlight-color: transparent;
-  }
+@theme {
+  --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Barlow Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
 
-  /* Custom scrollbars */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Pavimento in gomma, gesso, ferro e il giallo dei dischi da 15 kg */
+  --color-ink: #1a1c1f;
+  --color-panel: #222529;
+  --color-raised: #2c3035;
+  --color-line: #3a3f45;
+  --color-chalk: #eeebe4;
+  --color-muted: #a8a69e;
+  --color-faint: #7a7973;
+  --color-plate: #f0c33c;
+  --color-plate-ink: #2a2104;
+  --color-go: #5bbf8a;
+  --color-stop: #e8705a;
+
+  --radius-card: 1.25rem;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
   }
-  ::-webkit-scrollbar-track {
-    background: #090D16;
+  body {
+    @apply bg-ink text-chalk font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
-  ::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 9999px;
+  :focus-visible {
+    outline: 2px solid var(--color-plate);
+    outline-offset: 2px;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+  input, select, textarea, button {
+    font: inherit;
+  }
+  /* niente frecce nei campi numerici: si usano i pulsanti */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-xl border border-line bg-ink px-3 py-2.5 text-[15px] text-chalk placeholder:text-faint focus:border-plate focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-muted;
+  }
+  .card {
+    @apply rounded-(--radius-card) border border-line bg-panel;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

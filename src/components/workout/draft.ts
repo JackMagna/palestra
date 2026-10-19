@@ -16,8 +16,25 @@ export interface WorkoutDraft {
 
 const KEY = 'irontrack:workout-draft';
 
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/** Una bozza rovinata o di una versione vecchia non deve mai far partire l'app in crash. */
+export function isValidDraft(d: unknown): d is WorkoutDraft {
+  const x = d as Partial<WorkoutDraft> | null;
+  if (!x || typeof x !== 'object' || typeof x.dayId !== 'string' || !isNum(x.week) || !isNum(x.exIndex) || !isNum(x.setIndex)) return false;
+  if (x.startedAt !== null && !isNum(x.startedAt)) return false;
+  if (!x.hr || !isNum(x.hr.sum) || !isNum(x.hr.count) || !isNum(x.hr.max)) return false;
+  if (!x.sets || typeof x.sets !== 'object') return false;
+  return Object.values(x.sets).every(
+    (list) => Array.isArray(list) && list.every((s) => s && isNum(s.weightKg) && isNum(s.reps) && typeof s.completed === 'boolean')
+  );
+}
+
 export function loadDraft(): WorkoutDraft | null {
-  return readJSON<WorkoutDraft | null>(KEY, null);
+  const d = readJSON<unknown>(KEY, null);
+  if (isValidDraft(d)) return d;
+  if (d !== null) removeKey(KEY);
+  return null;
 }
 export function saveDraft(d: WorkoutDraft) {
   writeJSON(KEY, d);

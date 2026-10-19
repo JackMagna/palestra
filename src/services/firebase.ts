@@ -24,6 +24,8 @@ export const db = initializeFirestore(
   app,
   {
     ignoreUndefinedProperties: true,
+    // alcune reti mobili bloccano lo streaming: in quel caso passa a richieste normali
+    experimentalAutoDetectLongPolling: true,
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   },
   (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId

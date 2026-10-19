@@ -78,6 +78,8 @@ export function AccountSheet({ open, onClose, user, data, onLogin, onLogout, onI
           </div>
         </section>
 
+        <p className="border-t border-line pt-4 text-sm text-faint">Versione dell'app: {typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'sviluppo'}</p>
+
         {!installed && (
           <section className="space-y-3 border-t border-line pt-5">
             <h3 className="font-display text-lg font-semibold">Installa l'app</h3>

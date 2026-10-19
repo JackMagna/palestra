@@ -8,7 +8,7 @@ import {
 import { Button } from '../ui/Button';
 import { SafeImg } from './SafeImg';
 
-const PAGE = 40;
+const PAGE = 24;
 
 interface Props {
   onSelect: (e: LibraryExercise) => void;

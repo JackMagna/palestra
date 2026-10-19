@@ -15,6 +15,7 @@ import { LibraryScreen } from './components/exercise/LibraryScreen';
 import { ProgressScreen } from './components/progress/ProgressScreen';
 import { useToast } from './components/ui/Toast';
 import { Logo } from './components/layout/Logo';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const GUEST_KEY = 'irontrack:guest';
 
@@ -26,6 +27,7 @@ export default function App() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [tab, setTab] = useState<Tab>('workout');
   const [accountOpen, setAccountOpen] = useState(false);
+  const [waitedTooLong, setWaitedTooLong] = useState(false);
   const [editProgram, setEditProgram] = useState(false);
   const [data, actions] = useAppData(user, (msg) => toast(msg, 'error'));
 
@@ -47,6 +49,16 @@ export default function App() {
   }, []);
 
   useEffect(() => watchAuth((u) => { setUser(u); setAuthReady(true); }), []);
+
+  // Se Google o Firestore sono lenti o bloccati dalla rete, l'app parte comunque dopo qualche secondo.
+  useEffect(() => {
+    const t = setTimeout(() => setWaitedTooLong(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (waitedTooLong && user && !data.ready) toast('Connessione lenta: i dati si aggiorneranno appena Firestore risponde.', 'error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitedTooLong]);
 
   const login = async () => {
     setLoggingIn(true);
@@ -91,7 +103,7 @@ export default function App() {
     }
   };
 
-  if (!authReady || (user && !data.ready)) {
+  if (!waitedTooLong && (!authReady || (user && !data.ready))) {
     return (
       <div className="flex min-h-dvh items-center justify-center" aria-busy="true">
         <Logo className="h-12 w-12 animate-pulse" />
@@ -108,6 +120,7 @@ export default function App() {
     <AppShell tab={tab} onTab={setTab} accountLabel={accountLabel} onAccount={() => setAccountOpen(true)}>
       {/* L'allenamento resta montato: timer e sensore cardio non si interrompono cambiando sezione */}
       <div hidden={tab !== 'workout'}>
+        <ErrorBoundary inline resetKey={tab}>
         <WorkoutScreen
           program={data.program}
           sessions={data.sessions}
@@ -121,8 +134,10 @@ export default function App() {
           }}
           onEditProgram={() => { setEditProgram(true); setTab('program'); }}
         />
+        </ErrorBoundary>
       </div>
       {tab === 'program' && (
+        <ErrorBoundary inline resetKey={tab}>
         <ProgramScreen
           user={user}
           program={data.program}
@@ -134,9 +149,11 @@ export default function App() {
           startEditing={editProgram}
           onEditingConsumed={() => setEditProgram(false)}
         />
+        </ErrorBoundary>
       )}
-      {tab === 'library' && <LibraryScreen />}
+      {tab === 'library' && <ErrorBoundary inline resetKey={tab}><LibraryScreen /></ErrorBoundary>}
       {tab === 'progress' && (
+        <ErrorBoundary inline resetKey={tab}>
         <ProgressScreen
           program={data.program}
           sessions={data.sessions}
@@ -147,6 +164,7 @@ export default function App() {
           onStartWorkout={() => setTab('workout')}
           fitbit={fitbit}
         />
+        </ErrorBoundary>
       )}
       <AccountSheet
         open={accountOpen}

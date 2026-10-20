@@ -16,7 +16,9 @@ export function SafeImg({ path, alt, className = '', fallback = null, onFail, ea
   const sources = path ? imageSources(path) : [];
   const [attempt, setAttempt] = useState(0);
 
-  useEffect(() => setAttempt(0), [path]);
+  useEffect(() => {
+    setAttempt(0);
+  }, [path]);
 
   if (!path || attempt >= sources.length) return <>{fallback}</>;
   return (

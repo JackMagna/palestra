@@ -30,7 +30,9 @@ export function ExerciseEditor({ open, exercise, totalWeeks, onClose, onSave, on
   const [picking, setPicking] = useState(false);
   const { byId } = useLibrary();
 
-  useEffect(() => setValue(exercise), [exercise]);
+  useEffect(() => {
+    setValue(exercise);
+  }, [exercise]);
   if (!value) return null;
 
   const set = <K extends keyof ProgramExercise>(k: K, v: ProgramExercise[K]) => setValue({ ...value, [k]: v });

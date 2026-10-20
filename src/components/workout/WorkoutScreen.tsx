@@ -65,7 +65,9 @@ export function WorkoutScreen({ program, sessions, onFinish, onEditProgram }: Pr
     hrRef.current((d) => (d && d.startedAt ? { ...d, hr: { sum: d.hr.sum + v, count: d.hr.count + 1, max: Math.max(d.hr.max, v) } } : d));
   };
 
-  useEffect(() => () => hr?.disconnect(), [hr]);
+  useEffect(() => {
+    return () => hr?.disconnect();
+  }, [hr]);
 
   const day: ProgramDay | undefined = program.days.find((d) => d.id === draft?.dayId) ?? program.days[0];
 

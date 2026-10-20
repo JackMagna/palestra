@@ -31,7 +31,11 @@ export default function App() {
   const [editProgram, setEditProgram] = useState(false);
   const [data, actions] = useAppData(user, (msg) => toast(msg, 'error'));
 
-  useEffect(() => window.scrollTo({ top: 0 }), [tab]);
+  // Attenzione: in Chrome recenti scrollTo restituisce una Promise. Se l'effetto la restituisce,
+  // React la tratta come funzione di pulizia e va in crash al cambio di sezione. Serve il blocco { }.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [tab]);
 
   const notify = (message: string, kind: 'success' | 'error' = 'success') => toast(message, kind);
   const sync = useSheetsSync({ user, spreadsheetId: data.spreadsheetId, program: data.program, sessions: data.sessions, measurements: data.measurements, actions, notify });
@@ -48,7 +52,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => watchAuth((u) => { setUser(u); setAuthReady(true); }), []);
+  useEffect(() => {
+    const unsubscribe = watchAuth((u) => { setUser(u); setAuthReady(true); });
+    return unsubscribe;
+  }, []);
 
   // Se Google o Firestore sono lenti o bloccati dalla rete, l'app parte comunque dopo qualche secondo.
   useEffect(() => {

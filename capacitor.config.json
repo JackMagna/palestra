@@ -1,0 +1,6 @@
+{
+  "appId": "it.irontrack.app",
+  "appName": "IronTrack",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}

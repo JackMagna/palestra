@@ -12,7 +12,7 @@ const IT_EN: Record<string, string[]> = {
   curl: ['curl'], push: ['pushdown'], french: ['triceps', 'extension'], seduto: ['seated'],
   leg: ['leg'], extension: ['extension'], crunch: ['crunch'], reverse: ['reverse'], declinata: ['decline'],
   hyperextension: ['hyperextension'], iperestensioni: ['hyperextension'], hiperextension: ['hyperextension'],
-  squat: ['squat'], affondi: ['lunge'], stacco: ['deadlift'], stacchi: ['deadlift'], rumeno: ['romanian'],
+  revers: ['reverse'], squat: ['squat'], affondi: ['lunge'], stacco: ['deadlift'], stacchi: ['deadlift'], rumeno: ['romanian'],
   polpacci: ['calf'], calf: ['calf'], plank: ['plank'], parallele: ['dip'], dip: ['dip'],
   tricipiti: ['triceps'], bicipiti: ['biceps'], glutei: ['glute'], thrust: ['thrust'], press: ['press'],
   inclinata: ['incline'], inclinato: ['incline']

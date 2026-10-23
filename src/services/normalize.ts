@@ -101,6 +101,7 @@ export function normalizeProgram(raw: unknown): WorkoutProgram {
         sectionType: e.sectionType === 'cedimento' || e.sectionType === 'core' ? e.sectionType : 'progressione',
         restTimeSec: Math.max(0, num(e.restTimeSec, 120)),
         sheetRow: e.sheetRow ? num(e.sheetRow) : undefined,
+        cellMode: e.cellMode === 'loads' ? 'loads' : undefined,
         weeks: Object.fromEntries(Object.entries(e.weeks ?? {}).map(([k, v]) => [Number(k), String(v)]))
       }))
     }))

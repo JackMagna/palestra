@@ -61,6 +61,7 @@ function fakeSheets(initial: Record<string, string[][]>) {
 }
 
 const program = parseCoachSheet(SHEET, 'Scheda').program;
+const CHEST = 8; // riga 9 del foglio (indice 8): carichi nelle celle vuote della settimana
 const session = (weight: number, over: Partial<WorkoutSession> = {}): WorkoutSession => ({
   id: 's1', date: '2026-10-19', startedAt: 1, endedAt: 2, dayId: 'giorno-1', dayTitle: 'Giorno 1', weekNumber: 3,
   durationMinutes: 50, totalVolumeKg: 0,
@@ -77,7 +78,7 @@ beforeEach(() => { fake = fakeSheets({ Scheda: SHEET, MISURE: MISURE, Altro: [['
 describe('lettura', () => {
   it('elenca le schede e legge le celle', async () => {
     expect(await listTabs('t', 'ID')).toEqual(['Scheda', 'MISURE', 'Altro']);
-    expect((await readTab('t', 'ID', 'Scheda'))[5][0]).toBe('GIORNO 1');
+    expect((await readTab('t', 'ID', 'Scheda'))[6][0]).toBe('GIORNO 1');
   });
 });
 
@@ -85,19 +86,19 @@ describe('scrittura', () => {
   it('scrive i carichi accanto alla prescrizione del coach', async () => {
     const res = await annotateGrid('t', 'ID', program, [session(40)]);
     expect(res).toEqual({ written: 1, skipped: 0 });
-    expect(fake.tabs.get('Scheda')![7][4]).toBe('3X8 AUMENTO PESO · 40/42,5 kg');
-    expect(fake.tabs.get('Scheda')![7][0]).toBe('CHEST PRESS PRESA SOPRA'); // il resto non si tocca
+    expect(fake.tabs.get('Scheda')![CHEST][4]).toBe('40/42,5 kg');
+    expect(fake.tabs.get('Scheda')![CHEST][0]).toBe('CHEST PRESS PRESA SOPRA'); // il resto non si tocca
   });
   it('aggiorna la propria nota alla seduta successiva', async () => {
     await annotateGrid('t', 'ID', program, [session(40)]);
     await annotateGrid('t', 'ID', program, [session(42.5, { id: 's2', startedAt: 5 })]);
-    expect(fake.tabs.get('Scheda')![7][4]).toBe('3X8 AUMENTO PESO · 42,5/45 kg');
+    expect(fake.tabs.get('Scheda')![CHEST][4]).toBe('42,5/45 kg');
   });
   it('lascia stare le celle cambiate dal coach', async () => {
-    fake.tabs.get('Scheda')![7][4] = 'ora fai 5x5 a 60 kg';
+    fake.tabs.get('Scheda')![CHEST][4] = 'ora fai 5x5 a 60 kg';
     const res = await annotateGrid('t', 'ID', program, [session(40)]);
     expect(res).toEqual({ written: 0, skipped: 1 });
-    expect(fake.tabs.get('Scheda')![7][4]).toBe('ora fai 5x5 a 60 kg');
+    expect(fake.tabs.get('Scheda')![CHEST][4]).toBe('ora fai 5x5 a 60 kg');
   });
   it('non fa niente se la scheda non arriva da un foglio', async () => {
     expect(await annotateGrid('t', 'ID', { ...program, source: undefined }, [session(40)])).toEqual({ written: 0, skipped: 0 });

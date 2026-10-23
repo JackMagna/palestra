@@ -8,7 +8,8 @@ Funziona offline e si installa sul telefono.
 - **Mappa muscolare**: [react-body-highlighter](https://github.com/giavinh79/react-body-highlighter) (MIT).
 - **Dati**: Firestore con cache offline (con account Google) oppure solo sul dispositivo (senza account).
 - **Google Sheets**: legge la scheda del coach dal foglio condiviso e ci scrive i carichi (accanto a "3X10" nella cella della settimana) e le misure (scheda "Misure"). Le celle che il coach modifica non vengono toccate.
-- **Fitbit** (facoltativo): registra gli allenamenti, importa frequenza cardiaca e pesate. Richiede `VITE_FITBIT_CLIENT_ID` (vedi sotto).
+- **Misure**: la scheda MISURE del coach (colonne = settimane, righe PESO, VITA, ADDOME, FIANCHI, BRACCIO, COSCIA) si legge e si scrive nei due sensi. Se una cella ha un valore diverso dall'app, l'app chiede quale tenere.
+- **Dati salute** (facoltativo, una fonte per volta): **Fitbit** (anche dal sito, richiede `VITE_FITBIT_CLIENT_ID`) oppure **Health Connect** (solo app Android). Importano peso, massa grassa e frequenza cardiaca; le pesate inserite nell'app vengono inviate alla fonte scelta.
 - **Frequenza cardiaca** via Bluetooth (Chrome su Android e computer) ed esportazione TCX per Strava/Garmin.
 
 ## Sviluppo
@@ -28,6 +29,15 @@ bun run update-exercises
 
 Poi aggiorna `LIBRARY_COMMIT` in `src/lib/exerciseLibrary.ts` con l'ultimo commit di free-exercise-db,
 così le foto corrispondono ai dati.
+
+## App Android (Health Connect)
+
+Health Connect funziona solo dentro un'app Android: il codice è lo stesso del sito, impacchettato con Capacitor.
+Il workflow `.github/workflows/android.yml` costruisce l'APK a ogni push su `main`: lo scarichi da
+*Actions → ultima esecuzione → Artifacts → irontrack-apk* e lo installi sul telefono.
+Il progetto Android non è nel repository: lo genera il workflow (`npx cap add android`) e `scripts/patch-android.mjs`
+aggiunge i permessi di Health Connect. Il login Google dentro l'app Android richiede un passaggio in più (plugin nativo e
+impronta SHA-1 in Firebase): non è ancora incluso.
 
 ## Fitbit
 

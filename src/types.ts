@@ -13,6 +13,8 @@ export interface ProgramExercise {
   weeks: Record<number, string>;
   /** riga (da 1) di questo esercizio nel foglio del coach, se la scheda arriva da lì */
   sheetRow?: number;
+  /** 'loads': nel foglio le celle della riga sono vuote e servono a scrivere i carichi; la prescrizione sta nell'intestazione di sezione */
+  cellMode?: 'loads';
 }
 
 export interface ProgramDay {

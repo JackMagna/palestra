@@ -143,7 +143,7 @@ export async function annotateGrid(
   const ranges = plans.map((p) => `${quote(tab)}!${p.a1}`);
   const query = ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join('&');
   const current = await call<{ valueRanges: { values?: string[][] }[] }>(token, `${API}/${spreadsheetId}/values:batchGet?${query}&valueRenderOption=FORMATTED_VALUE`);
-  const writable = plans.filter((p, i) => canOverwrite(current.valueRanges[i]?.values?.[0]?.[0] ?? '', p.prescription));
+  const writable = plans.filter((p, i) => canOverwrite(current.valueRanges[i]?.values?.[0]?.[0] ?? '', p.prescription, p.mode));
   if (writable.length) {
     await call(token, `${API}/${spreadsheetId}/values:batchUpdate`, {
       method: 'POST',

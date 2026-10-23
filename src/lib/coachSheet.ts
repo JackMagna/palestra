@@ -40,6 +40,16 @@ function restFrom(label: string): number | null {
   return sec ? Number(sec[1]) : null;
 }
 
+/** Una prescrizione vera ha "x", "MAX" o un trattino (3X10, 4xMAX, 10-9-8..): i numeri soli sono carichi scritti a mano. */
+const isPrescription = (v: string) => /[x×]|max|\d\s*-\s*\d/i.test(v);
+/** Toglie le nostre note ("3X10 · 40 kg", "40/42,5 kg") quando si rilegge un foglio già compilato dall'app. */
+export function cleanCell(v: string): string {
+  const t = clean(v);
+  if (/^\d+([.,]\d+)?(\/\d+([.,]\d+)?)*\s*(kg|rip)$/i.test(t)) return '';
+  const base = t.split(' · ')[0].trim();
+  return isPrescription(base) ? base : '';
+}
+
 const isSectionLabel = (c0: string) => /^(progressione|cedimento|core|addominali)\b/i.test(c0) && /(serie|rip|rec)/i.test(c0);
 const isBareLabel = (c0: string) => /^(progressione|cedimento)\s*:?$/i.test(c0);
 
@@ -93,7 +103,7 @@ export function parseCoachSheet(rows: string[][], tab = ''): ParsedSheet {
 
     const next = di + 1 < dayStarts.length ? dayStarts[di + 1] : rows.length;
     const exercises: ProgramExercise[] = [];
-    let section: { type: SectionType; rest: number | null; warm: string } | null = null;
+    let section: { type: SectionType; rest: number | null; warm: string; weeks: Record<number, string> } | null = null;
 
     for (let i = start + 1; i < next; i++) {
       const r = rows[i];
@@ -105,7 +115,10 @@ export function parseCoachSheet(rows: string[][], tab = ''): ParsedSheet {
       }
       const hasWeeks = Object.values(cols).some((j) => cell(r, j) !== '');
       if (isSectionLabel(c0) || (isBareLabel(c0) && !hasWeeks && nextHasWeeks(rows, i, next, cols))) {
-        section = { type: sectionTypeOf(c0), rest: restFrom(c0), warm: noteCol >= 0 ? cell(r, noteCol) : '' };
+        // le prescrizioni per settimana stanno sulla riga di intestazione e valgono per gli esercizi sotto
+        const sectionWeeks: Record<number, string> = {};
+        Object.entries(cols).forEach(([w, j]) => { const v = cleanCell(cell(r, j)); if (v) sectionWeeks[Number(w)] = v; });
+        section = { type: sectionTypeOf(c0), rest: restFrom(c0), warm: noteCol >= 0 ? cell(r, noteCol) : '', weeks: sectionWeeks };
         continue;
       }
       if (isBareLabel(c0)) {
@@ -114,20 +127,27 @@ export function parseCoachSheet(rows: string[][], tab = ''): ParsedSheet {
       }
       if (!hasWeeks && cell(r, 1) === '' && !section) continue; // riga di testo isolata
 
-      const weeks: Record<number, string> = {};
-      Object.entries(cols).forEach(([w, j]) => (weeks[Number(w)] = cell(r, j)));
-      const values = Object.values(weeks).filter(Boolean);
+      // prescrizione scritta sulla riga dell'esercizio (es. addome 4xMAX), se c'è
+      const own: Record<number, string> = {};
+      Object.entries(cols).forEach(([w, j]) => { const v = cleanCell(cell(r, j)); if (v) own[Number(w)] = v; });
+      const ownValues = Object.values(own);
+      const ownIsMax = ownValues.length > 0 && ownValues.every((v) => /max/i.test(v));
+      const inherits = ownValues.length === 0 && !!section && Object.keys(section.weeks).length > 0;
+      const weeks: Record<number, string> = inherits ? { ...section!.weeks } : own;
+      const values = Object.values(weeks);
       const inferred: SectionType = values.length && values.every((v) => /max/i.test(v)) ? 'core' : values.length && values.every((v) => /^\d+\s*-\s*\d+/.test(v)) ? 'cedimento' : 'progressione';
-      const type = section?.type ?? inferred;
+      const type: SectionType = ownIsMax ? 'core' : section?.type ?? inferred;
+      const usesSection = !ownIsMax && !!section;
       const note = noteCol >= 0 ? cell(r, noteCol) : '';
       exercises.push({
         id: `ex-${di + 1}-${exercises.length + 1}`,
         name: sentenceCase(c0),
         note: note ? capFirst(sentenceCase(note)) : undefined,
-        warmupNote: section?.warm ? capFirst(sentenceCase(section.warm)) : undefined,
+        warmupNote: usesSection && section?.warm ? capFirst(sentenceCase(section.warm)) : undefined,
         sectionType: type,
-        restTimeSec: section?.rest ?? (type === 'core' ? 90 : 120),
+        restTimeSec: usesSection ? section?.rest ?? 120 : type === 'core' ? 90 : 120,
         weeks,
+        cellMode: inherits ? 'loads' : undefined,
         sheetRow: i + 1
       });
     }

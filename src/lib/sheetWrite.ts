@@ -22,12 +22,26 @@ export function loadsText(sets: Pick<SetEntry, 'weightKg' | 'setIndex'>[]): stri
 
 export const annotatedCell = (prescription: string, loads: string) => `${prescription} · ${loads}`;
 
+/** Esercizi senza peso (addome): si scrivono le ripetizioni fatte, es. "15/14/12 rip" */
+export function repsText(sets: Pick<SetEntry, 'reps' | 'setIndex'>[]): string {
+  return `${[...sets].sort((a, b) => a.setIndex - b.setIndex).map((s) => s.reps).join('/')} rip`;
+}
+
+const LOADS_RE = /^\d+([.,]\d+)?(\/\d+([.,]\d+)?)*\s*(kg|rip)$/i;
+
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** Si scrive solo se la cella è vuota o contiene ancora la prescrizione del coach (o una nostra nota precedente). */
-export function canOverwrite(current: string, prescription: string): boolean {
+export function canOverwrite(current: string, prescription: string, mode?: 'loads'): boolean {
   const c = norm(current);
-  return c === '' || (prescription.trim() !== '' && c.startsWith(norm(prescription)));
+  if (c === '') return true;
+  // celle dei carichi: si aggiorna solo ciò che ha scritto l'app ("40 kg", "40/42,5 kg")
+  if (mode === 'loads') return LOADS_RE.test(c);
+  // celle con la prescrizione (addome): si può aggiungere dopo "4xMAX", ma non toccare altro
+  const p = norm(prescription);
+  if (p === '' || !c.startsWith(p)) return false;
+  const rest = c.slice(p.length).replace(/^\s*·\s*/, '');
+  return rest === '' || LOADS_RE.test(rest);
 }
 
 export interface CellPlan {
@@ -35,6 +49,7 @@ export interface CellPlan {
   exerciseName: string;
   prescription: string;
   value: string;
+  mode?: 'loads';
 }
 
 const key = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
@@ -55,11 +70,13 @@ export function planAnnotations(program: WorkoutProgram, session: WorkoutSession
     const ex = exercises.find((e) => e.id === id)!;
     const prescription = ex.weeks[session.weekNumber] ?? '';
     if (!ex.sheetRow || !prescription) continue;
+    const text = sets.every((s) => s.weightKg === 0) ? repsText(sets) : loadsText(sets);
     plans.push({
       a1: `${colLetter(col)}${ex.sheetRow}`,
       exerciseName: ex.name,
       prescription,
-      value: annotatedCell(prescription, loadsText(sets))
+      mode: ex.cellMode,
+      value: ex.cellMode === 'loads' ? text : annotatedCell(prescription, text)
     });
   }
   return plans;

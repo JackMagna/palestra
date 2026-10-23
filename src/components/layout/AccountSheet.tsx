@@ -7,8 +7,8 @@ import { downloadText } from '../../lib/download';
 import { todayISO } from '../../lib/ids';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
-import { FitbitPanel } from './FitbitPanel';
-import type { FitbitApi } from '../../hooks/useFitbitSync';
+import { HealthPanel } from './HealthPanel';
+import type { HealthApi } from '../../hooks/useHealthSync';
 
 interface Props {
   open: boolean;
@@ -18,10 +18,10 @@ interface Props {
   onLogin: () => void;
   onLogout: () => void;
   onImport: (raw: unknown) => void;
-  fitbit: FitbitApi;
+  health: HealthApi;
 }
 
-export function AccountSheet({ open, onClose, user, data, onLogin, onLogout, onImport, fitbit }: Props) {
+export function AccountSheet({ open, onClose, user, data, onLogin, onLogout, onImport, health }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const { canInstall, installed, isIOS, install } = useInstallPrompt();
 
@@ -51,7 +51,7 @@ export function AccountSheet({ open, onClose, user, data, onLogin, onLogout, onI
           )}
         </section>
 
-        <FitbitPanel fitbit={fitbit} />
+        <HealthPanel health={health} />
 
         <section className="space-y-3 border-t border-line pt-5">
           <h3 className="font-display text-lg font-semibold">Backup</h3>

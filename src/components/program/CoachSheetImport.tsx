@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { WorkoutProgram } from '../../types';
-import { listTabs, parseSpreadsheetId, readTab } from '../../services/googleSheets';
+import { findMeasuresTab, listTabs, parseSpreadsheetId, readTab } from '../../services/googleSheets';
 import { authErrorMessage, withGoogleToken } from '../../services/firebase';
 import { mergeWithPrevious, parseCoachSheet, type ParsedSheet } from '../../lib/coachSheet';
 import { suggestLibraryId } from '../../lib/exerciseMatch';
@@ -60,6 +60,8 @@ export function CoachSheetImport({ open, onClose, currentProgram, currentSpreads
       let program = mergeWithPrevious(result.program, currentProgram);
       program = {
         ...program,
+        startDate: currentProgram.startDate,
+        source: program.source && { ...program.source, measuresTab: findMeasuresTab(tabs ?? []) },
         days: program.days.map((d) => ({
           ...d,
           exercises: d.exercises.map((e) => ({ ...e, libraryId: e.libraryId ?? suggestLibraryId(e.name, library) }))
@@ -126,6 +128,9 @@ export function CoachSheetImport({ open, onClose, currentProgram, currentSpreads
               <p className="font-display text-xl font-semibold">{parsed.program.title}</p>
               <p className="text-muted">
                 {[parsed.program.athlete, parsed.program.trainer && `con ${parsed.program.trainer}`].filter(Boolean).join(' ')} · {parsed.program.days.length} giorni · {parsed.exerciseCount} esercizi · {parsed.program.totalWeeks} settimane
+              </p>
+              <p className="mt-1 text-sm text-faint">
+                {parsed.program.source?.measuresTab ? `Scheda delle misure trovata: “${parsed.program.source.measuresTab}”. ` : 'Non trovo una scheda delle misure nel foglio. '}
               </p>
               <p className="mt-1 text-sm text-faint">{matched} esercizi su {parsed.exerciseCount} collegati alla libreria (foto e muscoli). Gli altri li colleghi dalla scheda.</p>
             </div>

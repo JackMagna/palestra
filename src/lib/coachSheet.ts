@@ -20,7 +20,7 @@ export function sentenceCase(s: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-function weekOf(cell: string): number | null {
+export function weekOf(cell: string): number | null {
   const a = cell.match(/(\d+)\s*[°ª^]?\s*(?:sett|settimana|week|wk)\b/i);
   if (a) return Number(a[1]);
   const b = cell.match(/^(?:sett|settimana|week|wk)\.?\s*(\d+)\s*$/i);

@@ -31,3 +31,11 @@ export const SHEET: string[][] = [
   row('portare tutte le serie a cedimento tecnico')
 ];
 
+
+/** La scheda MISURE del coach, come nello screenshot (righe 1-7 banner, riga 8 intestazione). */
+export const MISURE: string[][] = [
+  [], ['', 'PROGRAMMA PALESTRA'], [], ['', 'GIACOMO •  DARIO PERSONAL TRAINER'], [], [], [],
+  ['SETTIMANE', '1 SETT.', '2 SETT.', '3 SETT.', '4 SETT.', '5 SETT.', '6 SETT.', '7 SETT.'],
+  ['PESO', '106'], ['VITA', '102'], ['ADDOME', '110'], ['FIANCHI', '114'], ['BRACCIO CONTRAIONE', '39,5'], ['COSCIA', '73']
+];
+

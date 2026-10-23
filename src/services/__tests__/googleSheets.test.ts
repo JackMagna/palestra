@@ -1,20 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SHEET } from '../../lib/__tests__/fixtures';
+import { MISURE, SHEET } from '../../lib/__tests__/fixtures';
 import { parseCoachSheet } from '../../lib/coachSheet';
 import type { Measurement, WorkoutSession } from '../../types';
 
 vi.mock('../firebase', () => ({ GoogleTokenExpiredError: class extends Error {} }));
-const { annotateGrid, appendMeasurements, appendSessions, listTabs, readTab } = await import('../googleSheets');
+const { annotateGrid, appendMeasurements, appendSessions, findMeasuresTab, listTabs, readMeasures, readTab, writeMeasureCells } = await import('../googleSheets');
 
 /** Un Google Sheets finto in memoria, con solo le chiamate che usa l'app. */
 function fakeSheets(initial: Record<string, string[][]>) {
   const tabs = new Map<string, string[][]>(Object.entries(initial).map(([k, v]) => [k, v.map((r) => [...r])]));
   const calls: string[] = [];
+  const key = (name: string) => [...tabs.keys()].find((k) => k.toLowerCase() === name.toLowerCase()) ?? name;
   const cellOf = (range: string) => {
     const [tab, a1] = range.split('!');
     const m = a1.match(/^([A-Z]+)(\d+)$/)!;
     const col = [...m[1]].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
-    return { tab: tab.replace(/^'|'$/g, '').replace(/''/g, "'"), row: Number(m[2]) - 1, col };
+    return { tab: key(tab.replace(/^'|'$/g, '').replace(/''/g, "'")), row: Number(m[2]) - 1, col };
   };
   vi.stubGlobal('fetch', vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input);
@@ -39,16 +40,20 @@ function fakeSheets(initial: Record<string, string[][]>) {
       return ok({});
     }
     if (method === 'POST' && path.endsWith(':batchUpdate')) {
-      for (const r of body.requests) tabs.set(r.addSheet.properties.title, []);
+      for (const r of body.requests) {
+        const title = r.addSheet.properties.title;
+        if (key(title) !== title || tabs.has(title)) return { ok: false, status: 400, statusText: 'x', json: async () => ({ error: { message: `A sheet with the name "${title}" already exists.` } }) };
+        tabs.set(title, []);
+      }
       return ok({});
     }
     if (method === 'PUT') { const c = cellOf(path.split('/values/')[1]); tabs.set(c.tab, [...body.values]); return ok({}); }
     if (method === 'POST' && path.includes(':append')) {
-      const tab = path.split('/values/')[1].replace(':append', '').split('!')[0].replace(/^'|'$/g, '').replace(/''/g, "'");
+      const tab = key(path.split('/values/')[1].replace(':append', '').split('!')[0].replace(/^'|'$/g, '').replace(/''/g, "'"));
       tabs.get(tab)!.push(...body.values);
       return ok({});
     }
-    if (method === 'GET' && path.includes('/values/')) return ok({ values: tabs.get(path.split('/values/')[1].replace(/^'|'$/g, '')) });
+    if (method === 'GET' && path.includes('/values/')) return ok({ values: tabs.get(key(path.split('/values/')[1].replace(/^'|'$/g, ''))) });
     if (method === 'GET') return ok({ sheets: [...tabs.keys()].map((title) => ({ properties: { title } })) });
     return { ok: false, status: 404, statusText: 'x', json: async () => ({}) };
   }));
@@ -67,11 +72,11 @@ const session = (weight: number, over: Partial<WorkoutSession> = {}): WorkoutSes
 });
 
 let fake: ReturnType<typeof fakeSheets>;
-beforeEach(() => { fake = fakeSheets({ Scheda: SHEET, Altro: [['x']] }); });
+beforeEach(() => { fake = fakeSheets({ Scheda: SHEET, MISURE: MISURE, Altro: [['x']] }); });
 
 describe('lettura', () => {
   it('elenca le schede e legge le celle', async () => {
-    expect(await listTabs('t', 'ID')).toEqual(['Scheda', 'Altro']);
+    expect(await listTabs('t', 'ID')).toEqual(['Scheda', 'MISURE', 'Altro']);
     expect((await readTab('t', 'ID', 'Scheda'))[5][0]).toBe('GIORNO 1');
   });
 });
@@ -109,9 +114,40 @@ describe('scrittura', () => {
   it('aggiunge le misure nella scheda "Misure" dello stesso foglio', async () => {
     const m: Measurement = { id: 'm1', date: '2026-10-19', weightKg: 80.4, waistCm: 84 };
     await appendMeasurements('t', 'ID', [m]);
-    const t = fake.tabs.get('Misure')!;
+    const t = fake.tabs.get('Misure app')!;
     expect(t[0]).toContain('Peso (kg)');
-    expect(t[1]).toEqual(['2026-10-19', 80.4, '', '', 84, '', '', '']);
+    expect(t[1]).toEqual(['2026-10-19', '', 80.4, '', '', 84, '', '', '', '', '']);
     expect(fake.tabs.get('Scheda')).toEqual(SHEET); // la scheda del coach resta identica
+  });
+});
+
+describe('misure nel foglio del coach', () => {
+  it('trova la scheda MISURE e non confonde quella di ripiego', () => {
+    expect(findMeasuresTab(['ALLENAMENTO', 'MISURE'])).toBe('MISURE');
+    expect(findMeasuresTab(['ALLENAMENTO', 'Misure app'])).toBeUndefined();
+    expect(findMeasuresTab(['ALLENAMENTO'])).toBeUndefined();
+  });
+  it('legge il layout e scrive le celle come numeri', async () => {
+    const { layout, values } = await readMeasures('t', 'ID', 'MISURE');
+    expect(values[1]?.weightKg).toBe(106);
+    await writeMeasureCells('t', 'ID', 'MISURE', [{ a1: 'C9', value: 104.5 }, { a1: 'C14', value: 72 }]);
+    const grid = fake.tabs.get('MISURE')!;
+    expect(grid[8][2]).toBe(104.5);
+    expect(grid[13][2]).toBe(72);
+    expect(grid[8][1]).toBe('106'); // la colonna della settimana 1 non si tocca
+    expect(layout.weekCols[3]).toBe(3);
+  });
+  it('non prova a creare "Misure" quando esiste già "MISURE" (stesso nome per Google)', async () => {
+    fake.tabs.set('LOG CARICHI', [['Data']]);
+    await appendSessions('t', 'ID', [session(40)]);
+    expect(fake.calls.some((c) => c.includes(':batchUpdate') && !c.includes('values'))).toBe(false); // nessun addSheet
+    expect(fake.tabs.get('LOG CARICHI')!.length).toBeGreaterThan(1);
+    expect(fake.tabs.size).toBe(4); // Scheda, MISURE, Altro, LOG CARICHI: nessuna scheda duplicata
+  });
+  it('il ripiego usa una scheda con un altro nome', async () => {
+    const m: Measurement = { id: 'm1', date: '2026-10-19', week: 3, weightKg: 80.4, abdomenCm: 100, hipsCm: 112 };
+    await appendMeasurements('t', 'ID', [m]);
+    expect(fake.tabs.get('Misure app')![1]).toEqual(['2026-10-19', 3, 80.4, '', '', '', 100, 112, '', '', '']);
+    expect(fake.tabs.get('MISURE')).toEqual(MISURE); // quella del coach resta intatta
   });
 });

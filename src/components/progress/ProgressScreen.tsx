@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Download, Plus, Trash2 } from 'lucide-react';
 import type { Measurement, WorkoutProgram, WorkoutSession } from '../../types';
 import { exerciseTrend, personalBest, sessionsThisWeek } from '../../lib/stats';
@@ -7,11 +7,15 @@ import { sessionToTCX } from '../../lib/tcx';
 import { downloadText } from '../../lib/download';
 import { LineChart } from './LineChart';
 import { MeasurementForm } from './MeasurementForm';
+import { MeasuresSyncBar } from './MeasuresSyncBar';
+import type { MeasuresState } from '../../hooks/useSheetsSync';
+import type { MeasureConflict } from '../../lib/measuresSheet';
+import { inferStartDate, weekOfDate } from '../../lib/measuresSheet';
 import { Button, IconButton } from '../ui/Button';
 import { Sheet } from '../ui/Sheet';
 import { EmptyState } from '../ui/EmptyState';
 import { Segmented } from '../ui/Segmented';
-import type { FitbitApi } from '../../hooks/useFitbitSync';
+import type { HealthApi } from '../../hooks/useHealthSync';
 
 interface Props {
   program: WorkoutProgram;
@@ -21,10 +25,16 @@ interface Props {
   onDeleteMeasurement: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onStartWorkout: () => void;
-  fitbit: FitbitApi;
+  health: HealthApi;
+  loggedIn: boolean;
+  sheetConnected: boolean;
+  pendingMeasures: number;
+  measuresState: MeasuresState;
+  onSyncMeasures: (interactive: boolean) => void;
+  onResolveMeasure: (c: MeasureConflict, choice: 'sheet' | 'app') => void;
 }
 
-export function ProgressScreen({ program, sessions, measurements, onAddMeasurement, onDeleteMeasurement, onDeleteSession, onStartWorkout, fitbit }: Props) {
+export function ProgressScreen({ program, sessions, measurements, onAddMeasurement, onDeleteMeasurement, onDeleteSession, onStartWorkout, health, loggedIn, sheetConnected, pendingMeasures, measuresState, onSyncMeasures, onResolveMeasure }: Props) {
   const [view, setView] = useState<'training' | 'body'>('training');
   const [formOpen, setFormOpen] = useState(false);
   const [openSession, setOpenSession] = useState<string | null>(null);
@@ -37,8 +47,18 @@ export function ProgressScreen({ program, sessions, measurements, onAddMeasureme
   const volumeData = chrono.map((s) => ({ date: s.date, value: s.totalVolumeKg }));
   const trend = selected ? exerciseTrend(sessions, selected.id, selected.name) : [];
   const best = selected ? personalBest(sessions, selected.id, selected.name) : null;
-  const latest = measurements[measurements.length - 1];
-  const previous = measurements[measurements.length - 2];
+  const withWeight = measurements.filter((m) => m.weightKg !== undefined);
+  const latest = withWeight[withWeight.length - 1];
+  const previous = withWeight[withWeight.length - 2];
+  const startDate = inferStartDate(program, sessions);
+  const currentWeek = Math.min(program.totalWeeks, Math.max(1, weekOfDate(startDate, new Date().toISOString().slice(0, 10), program.totalWeeks)));
+  const latestAny = measurements[measurements.length - 1];
+
+  // aprendo le misure si ricontrolla il foglio (senza popup)
+  useEffect(() => {
+    if (view === 'body') onSyncMeasures(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   return (
     <div className="space-y-6">
@@ -133,11 +153,11 @@ export function ProgressScreen({ program, sessions, measurements, onAddMeasureme
                             <Button size="sm" icon={<Download className="h-4 w-4" />} onClick={() => downloadText(`allenamento-${s.date}.tcx`, sessionToTCX(s), 'application/vnd.garmin.tcx+xml')}>
                               Esporta TCX (Strava, Garmin)
                             </Button>
-                            {fitbit.connected && s.fitbitSynced !== true && (
-                              <Button size="sm" disabled={fitbit.busy} onClick={() => fitbit.syncSession(s)}>Registra su Fitbit</Button>
+                            {health.source === 'fitbit' && health.connected && s.fitbitSynced !== true && (
+                              <Button size="sm" disabled={health.busy} onClick={() => health.syncSession(s)}>Registra su Fitbit</Button>
                             )}
-                            {fitbit.connected && !s.avgBpm && (
-                              <Button size="sm" disabled={fitbit.busy} onClick={() => fitbit.importHeartRate(s)}>Importa frequenza da Fitbit</Button>
+                            {health.connected && !s.avgBpm && (
+                              <Button size="sm" disabled={health.busy} onClick={() => health.importHeartRate(s)}>Importa frequenza</Button>
                             )}
                             <Button size="sm" variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={() => window.confirm('Eliminare questo allenamento?') && onDeleteSession(s.id)}>
                               Elimina
@@ -156,11 +176,12 @@ export function ProgressScreen({ program, sessions, measurements, onAddMeasureme
 
       {view === 'body' && (
         <div className="space-y-6">
+          <MeasuresSyncBar connected={sheetConnected} loggedIn={loggedIn} pending={pendingMeasures} state={measuresState} onSync={onSyncMeasures} onResolve={onResolveMeasure} />
           <div className="flex flex-wrap items-center justify-between gap-3">
             {latest ? (
               <p className="text-[15px]">
-                Ultima pesata: <strong className="tabular-nums">{formatKg(latest.weightKg)} kg</strong>
-                {previous && <span className="text-muted"> ({latest.weightKg - previous.weightKg >= 0 ? '+' : ''}{formatKg(latest.weightKg - previous.weightKg)} kg dalla precedente)</span>}
+                Ultima pesata: <strong className="tabular-nums">{formatKg(latest.weightKg!)} kg</strong>
+                {previous && <span className="text-muted"> ({latest.weightKg! - previous.weightKg! >= 0 ? '+' : ''}{formatKg(latest.weightKg! - previous.weightKg!)} kg dalla precedente)</span>}
               </p>
             ) : <span />}
             <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setFormOpen(true)}>Nuova misura</Button>
@@ -172,26 +193,27 @@ export function ProgressScreen({ program, sessions, measurements, onAddMeasureme
             <div className="grid gap-6 lg:grid-cols-2">
               <section className="card min-w-0 p-4">
                 <h2 className="mb-3 font-display text-xl font-semibold">Peso corporeo</h2>
-                <LineChart data={measurements.map((m) => ({ date: m.date, value: m.weightKg }))} unit="kg" label="Peso corporeo" />
+                <LineChart data={withWeight.map((m) => ({ date: m.date, value: m.weightKg! }))} unit="kg" label="Peso corporeo" />
               </section>
               <section className="card min-w-0 overflow-x-auto p-4">
                 <h2 className="mb-3 font-display text-xl font-semibold">Tutte le misure</h2>
-                <table className="w-full min-w-[30rem] text-left text-[15px]">
+                <table className="w-full min-w-[36rem] text-left text-[15px]">
                   <thead className="text-sm text-muted">
                     <tr>
-                      {['Data', 'Peso', 'Grasso', 'Petto', 'Vita', 'Braccio', 'Coscia', ''].map((h) => <th key={h} scope="col" className="pb-2 pr-3 font-medium">{h}</th>)}
+                      {['Sett.', 'Data', 'Peso', 'Vita', 'Addome', 'Fianchi', 'Braccio', 'Coscia', ''].map((h) => <th key={h} scope="col" className="pb-2 pr-3 font-medium">{h}</th>)}
                     </tr>
                   </thead>
                   <tbody className="tabular-nums">
                     {[...measurements].reverse().map((m) => (
                       <tr key={m.id} className="border-t border-line/60">
+                        <td className="py-2 pr-3">{m.week ?? weekOfDate(startDate, m.date, program.totalWeeks)}</td>
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(m.date)}</td>
-                        <td className="py-2 pr-3">{formatKg(m.weightKg)}</td>
-                        <td className="py-2 pr-3">{m.bodyFat ?? '–'}</td>
-                        <td className="py-2 pr-3">{m.chestCm ?? '–'}</td>
-                        <td className="py-2 pr-3">{m.waistCm ?? '–'}</td>
-                        <td className="py-2 pr-3">{m.armsCm ?? '–'}</td>
-                        <td className="py-2 pr-3">{m.thighsCm ?? '–'}</td>
+                        <td className="py-2 pr-3">{m.weightKg !== undefined ? formatKg(m.weightKg) : '–'}</td>
+                        <td className="py-2 pr-3">{cm(m.waistCm)}</td>
+                        <td className="py-2 pr-3">{cm(m.abdomenCm)}</td>
+                        <td className="py-2 pr-3">{cm(m.hipsCm)}</td>
+                        <td className="py-2 pr-3">{cm(m.armsCm)}</td>
+                        <td className="py-2 pr-3">{cm(m.thighsCm)}</td>
                         <td className="py-1 text-right">
                           <IconButton label="Elimina misura" onClick={() => window.confirm('Eliminare questa misura?') && onDeleteMeasurement(m.id)}><Trash2 className="h-4 w-4" /></IconButton>
                         </td>
@@ -206,11 +228,13 @@ export function ProgressScreen({ program, sessions, measurements, onAddMeasureme
       )}
 
       <Sheet open={formOpen} onClose={() => setFormOpen(false)} title="Nuova misura">
-        <MeasurementForm latest={latest} onCancel={() => setFormOpen(false)} onSave={(m) => { onAddMeasurement(m); setFormOpen(false); }} />
+        <MeasurementForm latest={latestAny} totalWeeks={program.totalWeeks} currentWeek={currentWeek} startDate={startDate} onCancel={() => setFormOpen(false)} onSave={(m) => { onAddMeasurement(m); setFormOpen(false); }} />
       </Sheet>
     </div>
   );
 }
+
+const cm = (v?: number) => (v === undefined ? '–' : formatKg(v));
 
 function groupSets(s: WorkoutSession) {
   const map = new Map<string, WorkoutSession['sets']>();

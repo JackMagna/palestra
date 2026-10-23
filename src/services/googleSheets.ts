@@ -1,5 +1,6 @@
 import type { Measurement, WorkoutProgram, WorkoutSession } from '../types';
 import { canOverwrite, planAnnotations } from '../lib/sheetWrite';
+import { parseMeasuresTab, type MeasuresLayout, type SheetValues } from '../lib/measuresSheet';
 import { programRows } from '../lib/csv';
 import { GoogleTokenExpiredError } from './firebase';
 
@@ -55,15 +56,17 @@ export async function createSpreadsheetFromProgram(token: string, program: Worko
   return result;
 }
 
-const MEASURE_SHEET = 'Misure';
-const MEASURE_HEADER = ['Data', 'Peso (kg)', 'Grasso (%)', 'Petto (cm)', 'Vita (cm)', 'Braccio (cm)', 'Coscia (cm)', 'Note'];
+// Se il foglio ha già una scheda MISURE (maiuscole comprese) questa serve solo come ripiego.
+const MEASURE_SHEET = 'Misure app';
+const MEASURE_HEADER = ['Data', 'Settimana', 'Peso (kg)', 'Grasso (%)', 'Petto (cm)', 'Vita (cm)', 'Addome (cm)', 'Fianchi (cm)', 'Braccio (cm)', 'Coscia (cm)', 'Note'];
 
 const quote = (title: string) => `'${title.replace(/'/g, "''")}'`;
 
 /** Crea la scheda (tab) con l'intestazione se non esiste. Non tocca le altre schede del foglio. */
 async function ensureTab(token: string, spreadsheetId: string, title: string, header: string[]) {
   const meta = await call<{ sheets: { properties: { title: string } }[] }>(token, `${API}/${spreadsheetId}?fields=sheets.properties.title`);
-  if (meta.sheets.some((s) => s.properties.title === title)) return;
+  // Google considera uguali "MISURE" e "Misure": il confronto va fatto senza maiuscole
+  if (meta.sheets.some((s) => s.properties.title.toLowerCase() === title.toLowerCase())) return;
   await call(token, `${API}/${spreadsheetId}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({ requests: [{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }] })
@@ -110,10 +113,10 @@ export async function appendSessions(token: string, spreadsheetId: string, sessi
 export async function appendMeasurements(token: string, spreadsheetId: string, items: Measurement[]) {
   if (!items.length) return;
   await ensureTab(token, spreadsheetId, MEASURE_SHEET, MEASURE_HEADER);
-  const values = items.map((m) => [m.date, m.weightKg, m.bodyFat ?? '', m.chestCm ?? '', m.waistCm ?? '', m.armsCm ?? '', m.thighsCm ?? '', m.notes ?? '']);
+  const values = items.map((m) => [m.date, m.week ?? '', m.weightKg ?? '', m.bodyFat ?? '', m.chestCm ?? '', m.waistCm ?? '', m.abdomenCm ?? '', m.hipsCm ?? '', m.armsCm ?? '', m.thighsCm ?? '', m.notes ?? '']);
   await call(
     token,
-    `${API}/${spreadsheetId}/values/${encodeURIComponent(`${quote(MEASURE_SHEET)}!A:H`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    `${API}/${spreadsheetId}/values/${encodeURIComponent(`${quote(MEASURE_SHEET)}!A:K`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: 'POST', body: JSON.stringify({ values }) }
   );
 }
@@ -151,4 +154,24 @@ export async function annotateGrid(
     });
   }
   return { written: writable.length, skipped: plans.length - writable.length };
+}
+
+/** La scheda delle misure del coach: quella che si chiama MISURE (o simile). */
+export const findMeasuresTab = (tabs: string[]) => tabs.find((t) => /misure/i.test(t) && !/app$/i.test(t.trim()));
+
+/** Legge la scheda MISURE del coach: dove stanno settimane e righe, e i valori già inseriti. */
+export async function readMeasures(token: string, spreadsheetId: string, tab: string): Promise<{ layout: MeasuresLayout; values: SheetValues }> {
+  return parseMeasuresTab(await readTab(token, spreadsheetId, tab));
+}
+
+/** Scrive singole celle numeriche (come numeri veri, non testo). */
+export async function writeMeasureCells(token: string, spreadsheetId: string, tab: string, cells: { a1: string; value: number }[]) {
+  if (!cells.length) return;
+  await call(token, `${API}/${spreadsheetId}/values:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      valueInputOption: 'RAW',
+      data: cells.map((c) => ({ range: `${quote(tab)}!${c.a1}`, values: [[c.value]] }))
+    })
+  });
 }

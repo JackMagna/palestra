@@ -27,7 +27,7 @@ export const isoDay = (ms: number) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-export interface BodyEntry { date: string; weightKg: number; bodyFat?: number }
+export interface BodyEntry { date: string; weightKg?: number; bodyFat?: number }
 
 /** Unisce i registri di peso e di massa grassa di Fitbit, uno per giorno (vale l'ultimo del giorno). */
 export function mergeBody(weights: { date: string; weight: number }[], fats: { date: string; fat: number }[]): BodyEntry[] {

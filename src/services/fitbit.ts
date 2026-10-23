@@ -187,3 +187,13 @@ export async function fetchBody(days = 30): Promise<BodyEntry[]> {
   ]);
   return mergeBody(w.weight ?? [], f.fat ?? []);
 }
+
+/** Registra peso e/o massa grassa su Fitbit (stessa unità del profilo: l'header Accept-Language è metrico). */
+export async function logBody(entry: BodyEntry): Promise<void> {
+  if (entry.weightKg !== undefined) {
+    await api('/1/user/-/body/log/weight.json', { method: 'POST', body: new URLSearchParams({ weight: String(entry.weightKg), date: entry.date, time: '12:00:00' }) });
+  }
+  if (entry.bodyFat !== undefined) {
+    await api('/1/user/-/body/log/fat.json', { method: 'POST', body: new URLSearchParams({ fat: String(entry.bodyFat), date: entry.date, time: '12:00:00' }) });
+  }
+}

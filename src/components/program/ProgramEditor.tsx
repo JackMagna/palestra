@@ -72,6 +72,11 @@ export function ProgramEditor({ value, onChange, dayId, onSelectDay }: Props) {
           <input id="p-tr" className="field" value={value.trainer} onChange={(e) => onChange({ ...value, trainer: e.target.value })} />
         </div>
         <div>
+          <label className="label" htmlFor="p-start">Inizio settimana 1</label>
+          <input id="p-start" className="field" type="date" value={value.startDate ?? ''} onChange={(e) => onChange({ ...value, startDate: e.target.value || undefined })} />
+          <p className="mt-1 text-xs text-faint">Serve ad abbinare le misure alla settimana del foglio. Vuoto = lo deduco dagli allenamenti.</p>
+        </div>
+        <div>
           <label className="label" htmlFor="p-weeks">Settimane</label>
           <input
             id="p-weeks" className="field" type="number" inputMode="numeric" min={1} max={16}

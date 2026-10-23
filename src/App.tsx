@@ -3,8 +3,9 @@ import type { User } from 'firebase/auth';
 import { authErrorMessage, logout, signInWithGoogle, watchAuth } from './services/firebase';
 import { useAppData } from './hooks/useAppData';
 import { useSheetsSync } from './hooks/useSheetsSync';
-import { useFitbitSync } from './hooks/useFitbitSync';
+import { useHealthSync } from './hooks/useHealthSync';
 import { completeFitbitRedirect, getPrefs, isFitbitConnected } from './services/fitbit';
+import { getHealthSource } from './services/health';
 import { readJSON, removeKey, writeJSON } from './lib/storage';
 import { AppShell, type Tab } from './components/layout/AppShell';
 import { AccountSheet } from './components/layout/AccountSheet';
@@ -39,7 +40,7 @@ export default function App() {
 
   const notify = (message: string, kind: 'success' | 'error' = 'success') => toast(message, kind);
   const sync = useSheetsSync({ user, spreadsheetId: data.spreadsheetId, program: data.program, sessions: data.sessions, measurements: data.measurements, actions, notify });
-  const fitbit = useFitbitSync({ sessions: data.sessions, measurements: data.measurements, actions, hasSheet: !!data.spreadsheetId, notify });
+  const health = useHealthSync({ sessions: data.sessions, measurements: data.measurements, actions, hasSheet: !!data.spreadsheetId, notify });
 
   // ritorno dal login di Fitbit
   useEffect(() => {
@@ -135,7 +136,7 @@ export default function App() {
             actions.addSession({
               ...s,
               sheetsSynced: data.spreadsheetId ? false : undefined,
-              fitbitSynced: isFitbitConnected() && getPrefs().autoLog ? false : undefined
+              fitbitSynced: getHealthSource() === 'fitbit' && isFitbitConnected() && getPrefs().autoLog ? false : undefined
             });
             toast(`Allenamento salvato: ${s.sets.length} serie`);
           }}
@@ -165,11 +166,20 @@ export default function App() {
           program={data.program}
           sessions={data.sessions}
           measurements={data.measurements}
-          onAddMeasurement={(m) => { actions.addMeasurement({ ...m, sheetsSynced: data.spreadsheetId ? false : undefined }); toast('Misura salvata'); }}
+          onAddMeasurement={(m) => {
+            actions.addMeasurement({ ...m, sheetsSynced: data.spreadsheetId ? false : undefined, healthSynced: getHealthSource() !== 'none' ? false : undefined });
+            toast('Misura salvata');
+          }}
           onDeleteMeasurement={actions.deleteMeasurement}
           onDeleteSession={actions.deleteSession}
           onStartWorkout={() => setTab('workout')}
-          fitbit={fitbit}
+          health={health}
+          loggedIn={!!user}
+          sheetConnected={!!data.spreadsheetId}
+          pendingMeasures={data.measurements.filter((m) => m.sheetsSynced === false).length}
+          measuresState={sync.measures}
+          onSyncMeasures={sync.syncMeasures}
+          onResolveMeasure={sync.resolveConflict}
         />
         </ErrorBoundary>
       )}
@@ -181,7 +191,7 @@ export default function App() {
         onLogin={login}
         onLogout={signOut}
         onImport={importBackup}
-        fitbit={fitbit}
+        health={health}
       />
     </AppShell>
   );

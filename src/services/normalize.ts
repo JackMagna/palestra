@@ -47,14 +47,18 @@ export function normalizeMeasurement(raw: Loose, fallbackId?: string): Measureme
   return {
     id: str(raw.id) || fallbackId || `m-${Date.now()}`,
     date: str(raw.date) || new Date().toISOString().slice(0, 10),
-    weightKg: num(raw.weightKg),
+    week: opt(raw.week),
+    weightKg: opt(raw.weightKg),
     bodyFat: opt(raw.bodyFat),
     chestCm: opt(raw.chestCm),
     waistCm: opt(raw.waistCm),
+    abdomenCm: opt(raw.abdomenCm),
+    hipsCm: opt(raw.hipsCm),
     armsCm: opt(raw.armsCm),
     thighsCm: opt(raw.thighsCm),
     notes: str(raw.notes) || undefined,
     sheetsSynced: raw.sheetsSynced === undefined ? undefined : !!raw.sheetsSynced,
+    healthSynced: raw.healthSynced === undefined ? undefined : !!raw.healthSynced,
     source: str(raw.source) || undefined
   };
 }
@@ -70,9 +74,11 @@ export function normalizeProgram(raw: unknown): WorkoutProgram {
     trainer: str(p.trainer),
     totalWeeks,
     updatedAt: p.updatedAt,
+    startDate: str(p.startDate) || undefined,
     source: p.source?.tab
       ? {
           tab: String(p.source.tab),
+          measuresTab: p.source.measuresTab ? String(p.source.measuresTab) : undefined,
           annotate: !!p.source.annotate,
           weekCols: Object.fromEntries(Object.entries(p.source.weekCols ?? {}).map(([k, v]) => [Number(k), Number(v)]))
         }

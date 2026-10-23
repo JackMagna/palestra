@@ -34,6 +34,8 @@ export interface ProgramSource {
   tab: string;
   /** colonna (da 0) di ogni settimana */
   weekCols: Record<number, number>;
+  /** scheda delle misure nel foglio del coach (di solito "MISURE") */
+  measuresTab?: string;
   /** scrive i carichi nelle celle della settimana, accanto alla prescrizione */
   annotate: boolean;
 }
@@ -46,6 +48,8 @@ export interface WorkoutProgram {
   days: ProgramDay[];
   guidelines: ProgramGuidelines;
   source?: ProgramSource;
+  /** data (AAAA-MM-GG) del primo giorno della settimana 1: serve ad associare date e settimane */
+  startDate?: string;
   updatedAt?: string;
 }
 
@@ -80,15 +84,21 @@ export interface WorkoutSession {
 export interface Measurement {
   id: string;
   date: string;
-  weightKg: number;
+  /** settimana del programma (1..n): è la colonna del foglio del coach */
+  week?: number;
+  weightKg?: number;
   bodyFat?: number;
   chestCm?: number;
   waistCm?: number;
+  abdomenCm?: number;
+  hipsCm?: number;
   armsCm?: number;
   thighsCm?: number;
   notes?: string;
   sheetsSynced?: boolean;
-  /** es. "Fitbit" quando la pesata arriva da lì */
+  /** false = da inviare alla fonte dati salute scelta */
+  healthSynced?: boolean;
+  /** da dove arriva: Foglio, Fitbit, Health Connect (vuoto = inserita nell'app) */
   source?: string;
 }
 
